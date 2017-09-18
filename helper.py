@@ -10,6 +10,8 @@ import tensorflow as tf
 from glob import glob
 from urllib.request import urlretrieve
 from tqdm import tqdm
+from PIL import Image
+from PIL import ImageEnhance
 
 
 class DLProgress(tqdm):
@@ -56,6 +58,76 @@ def maybe_download_pretrained_vgg(data_dir):
 
         # Remove zip file to save space
         os.remove(os.path.join(vgg_path, vgg_filename))
+
+def gen_augmented_data(data_folder, image_shape, output_folder, augmentations):
+    image_paths = glob(os.path.join(data_folder, 'image_2', '*.png'))
+    label_paths = {
+        re.sub(r'_(lane|road)_', '_', os.path.basename(path)): path
+        for path in glob(os.path.join(data_folder, 'gt_image_2', '*_road_*.png'))}
+    background_color = np.array([255, 0, 0])
+
+    opf = os.path.join(output_folder, 'image_2')
+    if not os.path.exists(opf):
+        os.makedirs(opf)
+    else:
+        files = glob(opf + "/*")
+        for f in files:
+            os.remove(f)
+
+    opf = os.path.join(output_folder, 'gt_image_2')
+    if not os.path.exists(opf):
+        os.makedirs(opf)
+    else:
+        files = glob(opf + "/*")
+        for f in files:
+            os.remove(f)
+
+    random.shuffle(image_paths)
+    for i in range(0, len(image_paths)):
+        image_file = image_paths[i]
+        gt_image_file = label_paths[os.path.basename(image_file)]
+
+        image = Image.open(image_file)
+        gt_image = Image.open(gt_image_file)
+
+        invertedshape = (image_shape[1], image_shape[0])
+        image = image.resize(invertedshape)
+        gt_image = gt_image.resize(invertedshape)
+
+        image_file_name = os.path.splitext(os.path.basename(image_file))[0]
+        gt_image_file_name = os.path.splitext(os.path.basename(gt_image_file))[0]
+
+        for augmentation in range(augmentations):
+
+            image_augmented = image
+            gt_image_augmented = gt_image
+
+            if(random.random() > 0.5):
+                image_augmented = image_augmented.transpose(Image.FLIP_LEFT_RIGHT)
+                gt_image_augmented = gt_image_augmented.transpose(Image.FLIP_LEFT_RIGHT)
+
+            image_augmented = ImageEnhance.Color(image_augmented).enhance(random.uniform(0.5, 1.5))
+            image_augmented = ImageEnhance.Brightness(image_augmented).enhance(random.uniform(0.5, 1.5))
+            image_augmented = ImageEnhance.Contrast(image_augmented).enhance(random.uniform(0.5, 1.5))
+            image_augmented = ImageEnhance.Sharpness(image_augmented).enhance(random.uniform(0.5, 1.5))
+
+            image_augmented_name = image_file_name + "_" + str(augmentation + 1) + ".png"
+            gt_image_augmented_name = gt_image_file_name + "_" + str(augmentation + 1) + ".png"
+
+            image_augmented_name = os.path.join(output_folder, 'image_2', image_augmented_name)
+            gt_image_augmented_name = os.path.join(output_folder, 'gt_image_2', gt_image_augmented_name)
+
+            image_augmented.save(image_augmented_name)
+            gt_image_augmented.save(gt_image_augmented_name)
+
+        image_augmented_name = image_file_name + "_0.png"
+        gt_image_augmented_name = gt_image_file_name + "_0.png"
+
+        image_augmented_name = os.path.join(output_folder, 'image_2', image_augmented_name)
+        gt_image_augmented_name = os.path.join(output_folder, 'gt_image_2', gt_image_augmented_name)
+
+        scipy.misc.imsave(image_augmented_name, image)
+        scipy.misc.imsave(gt_image_augmented_name, gt_image)
 
 
 def gen_batch_function(data_folder, image_shape):
