@@ -84,6 +84,7 @@ def gen_augmented_data(data_folder, image_shape, output_folder, augmentations):
 
     random.shuffle(image_paths)
     for i in range(0, len(image_paths)):
+        print("Generating augmentations for object {} out of {}".format(i, len(image_paths)))
         image_file = image_paths[i]
         gt_image_file = label_paths[os.path.basename(image_file)]
 
